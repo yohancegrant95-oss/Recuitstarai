@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Facebook Group Outreach | RecruitStar</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font: 20px/1.45 system-ui, sans-serif; background: #eef3f8; color: #15263a; }
+main { max-width: 760px; margin: auto; padding: 16px; overflow-wrap: anywhere; }
+section { background: white; padding: 20px; border-radius: 16px; margin: 16px 0; }
+h1 { font-size: 30px; line-height: 1.2; }
+h2 { font-size: 24px; line-height: 1.25; }
+h3 { font-size: 21px; }
+a { color: #164c87; }
+label { display: block; margin: 12px 0 4px; }
+input, select, textarea, button { font: inherit; padding: 10px; min-height: 48px; max-width: 100%; }
+textarea, input, select { width: 100%; border: 1px solid #8796a6; border-radius: 8px; }
+button { border: 0; border-radius: 8px; background: #164c87; color: white; margin: 8px 0; }
+article { border-top: 1px solid #b9c6d3; margin-top: 16px; }
+li { margin: 8px 0; }
+</style>
+</head>
+<body>
+<main>
+<a href="./">Back to RecruitStar</a>
+<h1>Facebook Group Outreach</h1>
+<section>
+<h2>Find local groups</h2>
+<ul id="searches"></ul>
+<form id="search">
+<label for="query">Other city or search term</label>
+<input id="query" required placeholder="Example: Middletown Delaware jobs">
+<button>Search Facebook groups</button>
+</form>
+</section>
+<section>
+<h2>Recruiting post</h2>
+<label for="draft">Edit before posting</label>
+<textarea id="draft" rows="9">Now hiring Community Development Specialists in Wilmington, DE.
+
+Join Install America full-time and earn hourly pay plus commissions and performance bonuses. Paid training starts on day one. Grow from Community Development Specialist to Team Leader and Team Mentor, or pursue inside sales, appointment confirmation, or office management.
+
+Interviews are Monday through Friday, 10 a.m. to 2 p.m. Eastern. Apply through RecruitStar AI and tell us which interview time works for you.
+
+https://yohancegrant95-oss.github.io/Recuitstarai/</textarea>
+<button id="copy" type="button">Copy post</button>
+</section>
+<section>
+<h2>Group tracker</h2>
+<p>Tracking is saved in this browser. Join and post on Facebook after reviewing the group’s rules.</p>
+<form id="add">
+<label for="group-name">Group name</label>
+<input id="group-name" required maxlength="150">
+<label for="group-url">Facebook group link</label>
+<input id="group-url" type="url" required placeholder="https://www.facebook.com/groups/…">
+<button>Add group</button>
+</form>
+<p id="status" role="status"></p>
+<div id="groups"></div>
+</section>
+</main>
+<script>
+const get = id => document.getElementById(id);
+const searchUrl = query => "https://www.facebook.com/search/groups/?q=" + encodeURIComponent(query);
+for (const query of ["Wilmington Delaware jobs", "Newark Delaware jobs", "New Castle County hiring", "Delaware community jobs"]) {
+  const item = document.createElement("li");
+  const link = document.createElement("a");
+  link.href = searchUrl(query);
+  link.textContent = query;
+  item.append(link);
+  get("searches").append(item);
+}
+get("search").addEventListener("submit", event => {
+  event.preventDefault();
+  const query = get("query").value.trim();
+  if (query) location.href = searchUrl(query);
+});
+const key = "recruitstar-group-outreach-v1";
+const status = message => { get("status").textContent = message; };
+let groups = [];
+try { groups = JSON.parse(localStorage.getItem(key) || "[]"); }
+catch { status("Saved groups could not be loaded."); }
+function save() {
+  try { localStorage.setItem(key, JSON.stringify(groups)); return true; }
+  catch { status("This browser could not save the tracker."); return false; }
+}
+const draft = get("draft");
+get("copy").addEventListener("click", async event => {
+  try {
+    await navigator.clipboard.writeText(draft.value);
+    event.target.textContent = "Copied";
+  } catch {
+    draft.focus();
+    draft.select();
+    event.target.textContent = "Text selected. Tap Copy.";
+  }
+});
+get("add").addEventListener("submit", event => {
+  event.preventDefault();
+  const name = get("group-name").value.trim();
+  const url = new URL(get("group-url").value);
+  if (!name || url.protocol !== "https:" || !["facebook.com","www.facebook.com","m.facebook.com"].includes(url.hostname) || !/^\/groups\/[\w.-]+\/?$/.test(url.pathname)) {
+    status("Enter a group name and the Facebook group’s main link.");
+    return;
+  }
+  const link = "https://www.facebook.com" + url.pathname.replace(/\/$/, "");
+  if (groups.some(group => group.link === link)) {
+    status("That group is already in your tracker.");
+    return;
+  }
+  groups.push({name, link, membership:"To review", rules:"Unknown", posted:""});
+  if (save()) { event.target.reset(); status("Group added."); }
+  render();
+});
+function render() {
+  const list = get("groups");
+  list.replaceChildren();
+  for (const [i, group] of groups.entries()) {
+    const card = document.createElement("article");
+    const heading = document.createElement("h3");
+    const link = document.createElement("a");
+    link.textContent = group.name;
+    link.href = group.link;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    heading.append(link);
+    card.append(heading);
+    for (const [field, label, options] of [
+      ["membership","Membership",["To review","Requested","Joined","Skipped"]],
+      ["rules","Hiring posts",["Unknown","Allowed","Approval required","Prohibited"]]
+    ]) {
+      const caption = document.createElement("label");
+      const select = document.createElement("select");
+      select.id = field + i;
+      caption.htmlFor = select.id;
+      caption.textContent = label;
+      for (const option of options) select.add(new Option(option, option));
+      select.value = group[field];
+      select.addEventListener("change", () => { group[field] = select.value; save(); });
+      card.append(caption, select);
+    }
+    const posted = document.createElement("p");
+    posted.textContent = group.posted ? "Last posted " + new Date(group.posted).toLocaleDateString() : "No post logged";
+    const log = document.createElement("button");
+    log.type = "button";
+    log.textContent = "Log post";
+    log.addEventListener("click", () => {
+      group.posted = new Date().toISOString();
+      save();
+      render();
+    });
+    card.append(posted, log);
+    list.append(card);
+  }
+}
+render();
+</script>
+</body>
+</html>
